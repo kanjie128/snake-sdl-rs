@@ -74,15 +74,24 @@ struct DirEvent {
     cnt: usize,
 }
 
+#[derive(Debug, PartialEq)]
+enum SnakeStatus {
+    Running,
+    Pause,
+    Dead,
+}
+
 struct Snake {
     // last cell is snake head
     body: Vec<Cell>,
     dir_events: Vec<DirEvent>,
+    status: SnakeStatus,
 }
 
 #[derive(Debug)]
 enum SnakeError {
     OutBoard,
+    NotRunning,
 }
 
 pub enum SnakeEvent {
@@ -95,6 +104,7 @@ impl Snake {
         Self {
             body,
             dir_events: directs,
+            status: SnakeStatus::Running,
         }
     }
 
@@ -133,6 +143,9 @@ impl Snake {
     }
 
     fn move_ahead(&mut self) -> Result<(), SnakeError> {
+        if self.status != SnakeStatus::Running {
+            return Err(SnakeError::NotRunning);
+        }
         for (_, cell) in self.body.iter_mut().rev().enumerate() {
             for dir in &mut self.dir_events {
                 if cell.x == dir.cell.x && cell.y == dir.cell.y {
@@ -164,7 +177,7 @@ impl Snake {
 }
 
 pub fn start() {
-    sdl::init_sdl(WINDOW_WIDTH, WINDOW_HIGHT);
+    sdl::sdl_init(WINDOW_WIDTH, WINDOW_HIGHT).unwrap();
     let dir = Some(Direct::DOWN);
     let snake_zero = Snake::new(
         vec![
@@ -215,7 +228,16 @@ fn move_snake(mut snake: Snake) {
         }
         if let Err(e) = snake.move_ahead() {
             println!("snake error:{e:?}");
-            break;
+            match e {
+                SnakeError::OutBoard => {
+                    sdl::sdl_text_render(WINDOW_WIDTH, WINDOW_HIGHT, "Pacifico.ttf", "Game Over!")
+                        .unwrap();
+                    snake.status = SnakeStatus::Dead;
+                }
+                SnakeError::NotRunning => {
+                    println!("snake not running...");
+                }
+            }
         } else {
             std::thread::sleep(std::time::Duration::from_millis(SNAKE_MOVE_STEP_TIME));
         }
